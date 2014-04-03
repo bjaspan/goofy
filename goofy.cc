@@ -25,11 +25,13 @@
 
 #include <map>
 #include <iostream>
+#include <vector>
 
 #include "url.hh"
 
 typedef std::map<int,int> intmap;
 typedef std::map<int, const char *> strmap;
+typedef std::vector<std::string> strvec;
 
 struct wave_stat {
     wave_stat() {
@@ -151,6 +153,7 @@ void usage() {
 	    "\t-r ms	milliseconds between reports; defaults to -t\n"
 	    "\t-m secs	total seconds to run test; default is unlimited\n"
 	    "\t-f fds	maximum number of sockets to request from the os\n"
+	    "\t-h hdr	add hdr (\"Header: value\") to each request\n"
 	    "\t-d	debug\n");
     exit(1);
 }
@@ -428,10 +431,11 @@ int main(int argc, char **argv) {
     char ch;
     int num, stop_after;
     rlim_t max_fds;
+    strvec headers;
 
     num = debug = stop_after = 0;
     max_fds = 256;
-    while ((ch = getopt(argc, argv, "n:t:r:df:m:")) != -1) {
+    while ((ch = getopt(argc, argv, "n:t:r:df:m:h:")) != -1) {
 	switch (ch) {
 	case 'n':
 	    num = atoi(optarg);
@@ -450,6 +454,9 @@ int main(int argc, char **argv) {
 	    break;
 	case 'm':
 	    stop_after = atoi(optarg);
+	    break;
+	case 'h':
+	    headers.push_back(optarg);
 	    break;
 	default:
 	    usage();
@@ -575,7 +582,30 @@ int main(int argc, char **argv) {
 		    
 		    // Send the request. Make them all unique for now.
 		    char request[8192];
-		    sprintf(request, "GET %s&cnt=%d HTTP/1.0\r\nUser-Agent: Goofy 0.0\r\nHost: %s\r\n\r\n", url.request().c_str(), conn_info[i].request_number, url.host().c_str());
+		    int found_ua = 0, found_host = 0;
+		    sprintf(request, "GET %s&cnt=%d HTTP/1.0\r\n", url.request().c_str(), conn_info[i].request_number);
+		    for (strvec::iterator it = headers.begin(); it != headers.end(); it++) {
+			strcat(request, it->c_str());
+			strcat(request, "\r\n");
+			if (strcasestr(it->c_str(), "host:") != NULL) {
+			    found_host = 1;
+			}
+			if (strcasestr(it->c_str(), "user-agent:") != NULL) {
+			    found_ua = 1;
+			}
+		    }
+		    if (! found_host) {
+			strcat(request, "Host: ");
+			strcat(request, url.host().c_str());
+			strcat(request, "\r\n");
+		    }
+		    if (! found_ua) {
+			strcat(request, "User-Agent: Goofy 0.0\r\n");
+		    }
+		    strcat(request, "\r\n");
+		    if (debug)
+			printf("%s", request);
+		    
 		    int request_len = strlen(request);
 		    
 		    if (write(fds[i].fd, request, request_len) != request_len) {
