@@ -429,14 +429,17 @@ void init_http_codes() {
 int main(int argc, char **argv) {
     time_interval wave_interval("wave"), report_interval("report"), start("start");
     char ch;
-    int num, stop_after;
+    int num, stop_after, unique;
     rlim_t max_fds;
     strvec headers;
 
-    num = debug = stop_after = 0;
+    num = debug = stop_after = unique = 0;
     max_fds = 256;
-    while ((ch = getopt(argc, argv, "n:t:r:df:m:h:")) != -1) {
+    while ((ch = getopt(argc, argv, "un:t:r:df:m:h:")) != -1) {
 	switch (ch) {
+	case 'u':
+	    unique = 1;
+	    break;
 	case 'n':
 	    num = atoi(optarg);
 	    break;
@@ -580,10 +583,14 @@ int main(int argc, char **argv) {
 			printf("%d connect time: %lu\n", conn_info[i].request_number, delta);
 		    }
 		    
-		    // Send the request. Make them all unique for now.
+		    // Build the URL and request headers.
 		    char request[8192];
 		    int found_ua = 0, found_host = 0;
-		    sprintf(request, "GET %s&cnt=%d HTTP/1.0\r\n", url.request().c_str(), conn_info[i].request_number);
+		    sprintf(request, "GET %s", url.request().c_str());
+		    if (unique) {
+			sprintf(request+strlen(request), "&cnt=%d", conn_info[i].request_number);
+		    }
+		    strcat(request, " HTTP/1.0\r\n");
 		    for (strvec::iterator it = headers.begin(); it != headers.end(); it++) {
 			strcat(request, it->c_str());
 			strcat(request, "\r\n");
@@ -608,6 +615,7 @@ int main(int argc, char **argv) {
 		    
 		    int request_len = strlen(request);
 		    
+		    // Send the request.
 		    if (write(fds[i].fd, request, request_len) != request_len) {
 			// We can't write the request to the socket, give up.
 			wave_stats.write[errno]++;
