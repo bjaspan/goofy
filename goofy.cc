@@ -148,13 +148,13 @@ strmap http_codes;
 
 void usage() {
     fprintf(stderr, "Usage: goofy [args] url\n"
-	    "\t-n num	number of requests per wave\n"
-	    "\t-t ms	milliseconds between waves\n"
-	    "\t-r ms	milliseconds between reports; defaults to -t\n"
-	    "\t-m secs	total seconds to run test; default is unlimited\n"
-	    "\t-f fds	maximum number of sockets to request from the os\n"
-	    "\t-h hdr	add hdr (\"Header: value\") to each request\n"
-	    "\t-d	debug\n");
+	    "\t-n num[:limit]	number of requests per wave, limit times\n"
+	    "\t-t ms		milliseconds between waves\n"
+	    "\t-r ms		milliseconds between reports; defaults to -t\n"
+	    "\t-m secs		total seconds to run test; default is unlimited\n"
+	    "\t-f fds		maximum number of sockets to request from the os\n"
+	    "\t-h hdr		add hdr (\"Header: value\") to each request\n"
+	    "\t-d		debug\n");
     exit(1);
 }
 
@@ -428,12 +428,13 @@ void init_http_codes() {
 
 int main(int argc, char **argv) {
     time_interval wave_interval("wave"), report_interval("report"), start("start");
+    char *wave_spec, *p;
     char ch;
-    int num, stop_after, unique;
+    int num, stop_after, unique, wave_limit;
     rlim_t max_fds;
     strvec headers;
 
-    num = debug = stop_after = unique = 0;
+    num = debug = stop_after = unique = wave_limit = 0;
     max_fds = 256;
     while ((ch = getopt(argc, argv, "un:t:r:df:m:h:")) != -1) {
 	switch (ch) {
@@ -444,7 +445,7 @@ int main(int argc, char **argv) {
 	    num = atoi(optarg);
 	    break;
 	case 't':
-	    wave_interval.set(atoi(optarg)*1000);
+	    wave_spec = strdup(optarg);
 	    break;
 	case 'r':
 	    report_interval.set(atoi(optarg)*1000);
@@ -465,6 +466,12 @@ int main(int argc, char **argv) {
 	    usage();
 	}
     }
+
+    wave_interval.set(atoi(wave_spec)*1000);
+    if (p = strchr(wave_spec, ':')) {
+	wave_limit = atoi(p+1);
+    }
+
     if (report_interval.get() == 0) {
 	report_interval.set(wave_interval.get());
     }
@@ -513,7 +520,9 @@ int main(int argc, char **argv) {
     struct timeval now;
     time_interval::gettod(&now);
     start.mark(&now);
-    open_connections(num, (struct sockaddr *)&addr);
+    if (wave_limit-- > 0) {
+	open_connections(num, (struct sockaddr *)&addr);
+    }
     report_connections(&start);
     
     int wait_interval = std::min(wave_interval.get(), report_interval.get())/1000;
@@ -534,7 +543,9 @@ int main(int argc, char **argv) {
 
 	time_interval::gettod(&now);
 	if (wave_interval.passed(&now)) {
-	    open_connections(num, (struct sockaddr *)&addr);
+	    if (wave_limit-- > 0) {
+		open_connections(num, (struct sockaddr *)&addr);
+	    }
 	    wave_interval.mark(&now);
 	}
 
