@@ -148,13 +148,14 @@ strmap http_codes;
 
 void usage() {
     fprintf(stderr, "Usage: goofy [args] url\n"
-	    "\t-n num		number of requests per wave\n"
-	    "\t-t ms[:limit]	milliseconds between waves; limit total waves\n"
-	    "\t-r ms		milliseconds between reports; defaults to -t\n"
-	    "\t-m secs		total seconds to run test; default is unlimited\n"
-	    "\t-f fds		maximum number of sockets to request from the os\n"
-	    "\t-h hdr		add hdr (\"Header: value\") to each request\n"
-	    "\t-d		debug\n");
+            "  -n num           number of requests per wave\n"
+            "  -t ms[:limit]    milliseconds between waves; limit total waves\n"
+            "                   default is just one wave\n"
+            "  -r ms            milliseconds between reports; defaults to -t\n"
+            "  -m secs          total seconds to run test; default is unlimited\n"
+            "  -f fds           maximum number of sockets to request from the os\n"
+            "  -h hdr           add hdr (\"Header: value\") to each request\n"
+            "  -d               debug\n");
     exit(1);
 }
 
@@ -430,7 +431,7 @@ void init_http_codes() {
 
 int main(int argc, char **argv) {
     time_interval wave_interval("wave"), report_interval("report"), start("start");
-    char *wave_spec, *p;
+    const char *wave_spec, *p;
     char ch;
     int num, stop_after, unique, wave_limit, no_wave_limit;
     rlim_t max_fds;
@@ -438,6 +439,8 @@ int main(int argc, char **argv) {
 
     num = debug = stop_after = unique = wave_limit = 0;
     no_wave_limit = 1;
+    // default wave spec is just one wave
+    wave_spec = "1:1";
     max_fds = 256;
     while ((ch = getopt(argc, argv, "un:t:r:df:m:h:")) != -1) {
 	switch (ch) {
@@ -448,7 +451,7 @@ int main(int argc, char **argv) {
 	    num = atoi(optarg);
 	    break;
 	case 't':
-	    wave_spec = strdup(optarg);
+	    wave_spec = optarg;
 	    break;
 	case 'r':
 	    report_interval.set(atoi(optarg)*1000);

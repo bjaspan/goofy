@@ -21,9 +21,9 @@ Goofy is a new tool and I do not yet fully understand all of its use
 cases, but see A History of a Thousand Connections below for a lengthy
 example showing its usefulness.
 
-----------------------------------------------------------------------
-A Length Example: A History of a Thousand Conncetions
-----------------------------------------------------------------------
+## A Lengthy Example: A History of a Thousand Conncetions
+
+[ This experiment was conducted in 2010. ]
 
 At Acquia, we run an Apache web server running PHP under FastCGI using
 mod_fcgid. I wanted to understand exactly how the number of Apache
@@ -34,14 +34,18 @@ I accomplished this by having Goofy initiate 1,000 simultaneous
 connections to a URL that just sleeps for 60 seconds and waits for
 them all to finish one way or another. The command line is:
 
-# ./goofy -n 1000 -t 1000000 -r 2000 'http://server/sleep.php?sleep=60'
+```
+$ ./goofy -n 1000 -r 2000 'http://server/sleep.php?sleep=60'
+```
 
--n is how many connections to initiate in each wave, -t is how
- many milliseconds to wait between each wave, and -r is how many
- milliseconds separate each reporting interval. These options say to
- open 1,000 connections every 1,000 seconds (in other words, I only
- want one wave) but to report results every 2 seconds. Goofy produces
- no output if nothing happens during a particular reporting interval.
+* -n is how many connections to initiate in each wave
+* -t is how many milliseconds to wait between each wave; since it isn't
+  specified, only one wave occurs
+* -r is how many milliseconds separate each reporting interval
+
+These options say to open 1,000 connections and to report results
+every 2 seconds. Goofy produces no output if nothing happens during a
+particular reporting interval.
 
 For this test, the server was an EC2 m1.small instance configured with
 256 Apache processes but only 10 php-cgi processes. I learned:
@@ -59,8 +63,7 @@ For this test, the server was an EC2 m1.small instance configured with
 * mod_fcgi consistently kicks out PHP requests that cannot get a PHP
   process after 65 seconds.
 
-
-
+```
      | wave stats | | total | | wave results              |
 secs open conn clos pend estb errs  200  500  503  504  xxx
 ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
@@ -89,9 +92,13 @@ secs open conn clos totl  err  200  500  503  504  xxx Notes added by hand
   85    0    0   30  680    0    0    0   30    0    0 more
   87    0    0   32  648    0    0    0   32    0    0 more
   89    0    0    1  647    0    0    0    1    0    0 more
+```
 
-So, after 90 seconds, at the TCP level we've seen 610 connections and 99 connection resets. After all that, we had the 10 status 200 completions, then mod_fcgid kicked out 244 requests with status 503.
+So, after 90 seconds, at the TCP level we've seen 610 connections and
+99 connection resets. After all that, we had the 10 status 200
+completions, then mod_fcgid kicked out 244 requests with status 503.
 
+```
   95    0  282    0  647    0    0    0    0    0    0 The server accepts 282 more TCP connections.
  121    0    0    1  646    0    1    0    0    0    0 It's been 120 seconds. 10 more lucky php requests complete.
  124    0    0    9  637    0    9    0    0    0    0
@@ -129,3 +136,4 @@ So, after 90 seconds, at the TCP level we've seen 610 connections and 99 connect
  234    0    0   37   10    0    0    0   37    0    0 more
  241    0    0    1    9    0    1    0    0    0    0 At four minutes, the last 10 luck php requests complete.
  244    0    0    9    0    0    9    0    0    0    0 And now we're done.
+```
