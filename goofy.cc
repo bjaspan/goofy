@@ -148,8 +148,8 @@ strmap http_codes;
 
 void usage() {
     fprintf(stderr, "Usage: goofy [args] url\n"
-	    "\t-n num[:limit]	number of requests per wave, limit times\n"
-	    "\t-t ms		milliseconds between waves\n"
+	    "\t-n num		number of requests per wave\n"
+	    "\t-t ms[:limit]	milliseconds between waves; limit total waves\n"
 	    "\t-r ms		milliseconds between reports; defaults to -t\n"
 	    "\t-m secs		total seconds to run test; default is unlimited\n"
 	    "\t-f fds		maximum number of sockets to request from the os\n"
@@ -324,6 +324,8 @@ void report_connections(time_interval *start) {
     // Sum statuses.
     for (int i = 0; i < fds_len; ++i) {
 	switch (conn_info[i].state) {
+	case CONN_UNUSED:
+	    break;
 	case CONN_CONNECTING:
 	    connecting++;
 	    break;
@@ -430,11 +432,12 @@ int main(int argc, char **argv) {
     time_interval wave_interval("wave"), report_interval("report"), start("start");
     char *wave_spec, *p;
     char ch;
-    int num, stop_after, unique, wave_limit;
+    int num, stop_after, unique, wave_limit, no_wave_limit;
     rlim_t max_fds;
     strvec headers;
 
     num = debug = stop_after = unique = wave_limit = 0;
+    no_wave_limit = 1;
     max_fds = 256;
     while ((ch = getopt(argc, argv, "un:t:r:df:m:h:")) != -1) {
 	switch (ch) {
@@ -468,8 +471,10 @@ int main(int argc, char **argv) {
     }
 
     wave_interval.set(atoi(wave_spec)*1000);
-    if (p = strchr(wave_spec, ':')) {
+    p = strchr(wave_spec, ':');
+    if (p != NULL) {
 	wave_limit = atoi(p+1);
+	no_wave_limit = 0;
     }
 
     if (report_interval.get() == 0) {
@@ -520,7 +525,7 @@ int main(int argc, char **argv) {
     struct timeval now;
     time_interval::gettod(&now);
     start.mark(&now);
-    if (wave_limit-- > 0) {
+    if (no_wave_limit || wave_limit-- > 0) {
 	open_connections(num, (struct sockaddr *)&addr);
     }
     report_connections(&start);
@@ -543,7 +548,7 @@ int main(int argc, char **argv) {
 
 	time_interval::gettod(&now);
 	if (wave_interval.passed(&now)) {
-	    if (wave_limit-- > 0) {
+	    if (no_wave_limit || wave_limit-- > 0) {
 		open_connections(num, (struct sockaddr *)&addr);
 	    }
 	    wave_interval.mark(&now);
