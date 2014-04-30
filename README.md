@@ -49,7 +49,7 @@ sleeps for 3 seconds. By default, goofy reports results every second. Here's
 what happened:
 
 ```
-$ ./goofy -n 3 'http://server/sleep.php?sleep=3'
+$ ./goofy -n 10 'http://server/sleep.php?sleep=3'
      | delta      | | total | | results                   |
 secs  new estb clos pend estb errs  200  500  503  504  xxx Notes added by hand
 ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- -----------------------------------------------------
