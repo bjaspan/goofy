@@ -51,11 +51,11 @@ what happened:
 ```
 $ ./goofy -n 3 'http://server/sleep.php?sleep=3'
      | delta      | | total | | results                   |
-secs  new conn clos pend estb errs  200  500  503  504  xxx Notes added by hand
+secs  new estb clos pend estb errs  200  500  503  504  xxx Notes added by hand
 ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- -----------------------------------------------------
    0   10    0    0   10    0    0    0    0    0    0    0 10 connections opened, all still pending.
    1    0   10    0    0   10    0    0    0    0    0    0 10 connections became established.
-   2    0    0    0    0   10    0    0    0    0    0    0 No new conns became establishes, but all 10 still are.
+   2    0    0    0    0   10    0    0    0    0    0    0 All 10 connections are still established.
    4    0    0    4    0    6    0    4    0    0    0    0 Between 3-4s, *four* requests complete. Why not 10?
    5    0    0    0    0    6    0    0    0    0    0    0
    7    0    0    4    0    2    0    4    0    0    0    0 Between 6-7s, four more complete.
@@ -111,7 +111,7 @@ For this test, the server was an EC2 m1.small instance configured with
 
 ```
      | delta      | | total | | results              |
-secs  new conn clos totl  err  200  500  503  504  xxx Notes added by hand
+secs  new estb clos totl  err  200  500  503  504  xxx Notes added by hand
 ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- -----------------------------------------------------
    0 1000    0    0 1000    0    0    0    0    0    0 1000 new non-blocking connections opened.
    2    0  256    0 1000    0    0    0    0    0    0 256 of the non-blocking connections actually connect.
