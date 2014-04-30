@@ -266,8 +266,8 @@ void report_connections(time_interval *start) {
     static int rows = 0;
 
     if (rows == 0) {
-	printf("     | wave stats | | total | | wave results              |\n"
-	       "secs open conn clos pend estb errs  200  500  503  504  xxx\n"
+	printf("     | delta      | | total | | results                   |\n"
+	       "secs  new estb clos pend estb errs  200  500  503  504  xxx\n"
 	       "---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----\n");
     }
     rows++;
