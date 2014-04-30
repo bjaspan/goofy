@@ -22,8 +22,9 @@ connections closed (syscall error or HTTP status).
 ```
 Usage: goofy [args] url
   -n num           number of requests per wave
-  -t ms[:limit]    milliseconds between waves; run limit total waves
-  -r ms            milliseconds between reports; defaults to -t
+  -t ms[:limit]    milliseconds between waves; run limit total waves;
+                   default to one wave
+  -r ms            milliseconds between reports; defaults to -t or 1000
   -m secs          total seconds to run test; default is unlimited
   -f fds           maximum number of sockets to request from the os
   -h hdr           add hdr ("Header: value") to each request
@@ -34,55 +35,42 @@ Usage: goofy [args] url
 
 [ This experiment was conducted in 2014. ]
 
-I want to understand how PHP-FPM handles concurrent incoming requests. We are
-using Apache running mod_fastcgi talking to PHP-FPM configured with:
+I noticed a problem with how the PHP-FPM ondemand process manager spawns worker
+processes. PHP-FPM is running under Apache, and is configured with:
 
 ```
 pm = ondemand
 pm.max_children = 100
-pm.start_servers = 1
-pm.min_spare_servers = 1
-pm.max_spare_servers = 2
 pm.process_idle_timeout = 10s
-pm.max_requests = 500
 ```
 
-For this test, I'll create three new requests per wave, for three waves, one
-second apart (9 total requests), each to a PHP script that sleeps for 7
-seconds. goofy will report results every second. Here's what happened:
+To test it, I ran just one wave of 10 requests, each to a PHP script that
+sleeps for 3 seconds. By default, goofy reports results every second. Here's
+what happened:
 
 ```
-$ ./goofy -n 3 -t 1000:3 'http://server/sleep.php?sleep=7'
-     | wave stats | | total | | wave results              |
-secs open conn clos pend estb errs  200  500  503  504  xxx Notes added by hand
+$ ./goofy -n 3 'http://server/sleep.php?sleep=3'
+     | delta      | | total | | results                   |
+secs  new conn clos pend estb errs  200  500  503  504  xxx Notes added by hand
 ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- -----------------------------------------------------
-   0    3    0    0    3    0    0    0    0    0    0    0 3 connections opened, all are pending.
-   1    3    3    0    3    3    0    0    0    0    0    0 3 more open & pending; 3 that were pending connected
-														    and are now established. 
-   2    3    3    0    3    6    0    0    0    0    0    0 Ditto, so now 6 are established.
-   3    0    3    0    0    9    0    0    0    0    0    0 All 9 are now established.
-   4    0    0    0    0    9    0    0    0    0    0    0
-   8    0    0    1    0    8    0    1    0    0    0    0 At 7-8s, one request completes. Why not 3?
-   9    0    0    0    0    8    0    0    0    0    0    0
-  15    0    0    1    0    7    0    1    0    0    0    0 At 14-15s, one more completes. Why not 3?
-  16    0    0    0    0    7    0    0    0    0    0    0
-  22    0    0    1    0    6    0    1    0    0    0    0 The pattern continues. Every 7s, one more request
-  23    0    0    0    0    6    0    0    0    0    0    0 completes. Apparently, FPM is handling the 
-  29    0    0    1    0    5    0    1    0    0    0    0 requests serially instead of launching more procs.
-  30    0    0    0    0    5    0    0    0    0    0    0
-  36    0    0    1    0    4    0    1    0    0    0    0 This is definitely a problem.
-  37    0    0    0    0    4    0    0    0    0    0    0
-  43    0    0    1    0    3    0    1    0    0    0    0
-  44    0    0    0    0    3    0    0    0    0    0    0
-  50    0    0    1    0    2    0    1    0    0    0    0
-  51    0    0    0    0    2    0    0    0    0    0    0
-  57    0    0    1    0    1    0    1    0    0    0    0
-  58    0    0    0    0    1    0    0    0    0    0    0
-  64    0    0    1    0    0    0    1    0    0    0    0
-  65    0    0    0    0    0    0    0    0    0    0    0 All requests are complete.
+   0   10    0    0   10    0    0    0    0    0    0    0 10 connections opened, all still pending.
+   1    0   10    0    0   10    0    0    0    0    0    0 10 connections became established.
+   2    0    0    0    0   10    0    0    0    0    0    0 No new conns became establishes, but all 10 still are.
+   4    0    0    4    0    6    0    4    0    0    0    0 Between 3-4s, *four* requests complete. Why not 10?
+   5    0    0    0    0    6    0    0    0    0    0    0
+   7    0    0    4    0    2    0    4    0    0    0    0 Between 6-7s, four more complete.
+   8    0    0    0    0    2    0    0    0    0    0    0
+  10    0    0    2    0    0    0    2    0    0    0    0 Between 9-10s, the last two complete.
+  11    0    0    0    0    0    0    0    0    0    0    0
 ```
 
-This very clearly proves that PHP-FPM is not behaving the way we expect.
+PHP-FPM should have spawned 10 processes, but this shows that it only spawned
+four; ps on the server confirms this observation. Even when the first set of
+requests finished and there were still six pending, still no new workers were
+spawned.
+
+Clearly, PHP-FPM is not behaving correctly. This data helped me track down the
+bug in the ondemand process manager; a fix is forthcoming.
 
 ## A lengthy example: A History of a Thousand Conncetions
 
@@ -108,7 +96,7 @@ particular reporting interval.
 For this test, the server was an EC2 m1.small instance configured with
 256 Apache processes but only 10 php-cgi processes. I learned:
 
-* XXX WRONG. The server kernel/Apache accepts more than one TCP
+* The server kernel/Apache accepts more than one TCP
   connection per Apache process, but not even as many as two per
   Apache process. So the "listen queue" is not behaving as I
   expect. It seems like we should expect to get at least 1,280
@@ -122,8 +110,8 @@ For this test, the server was an EC2 m1.small instance configured with
   process after 65 seconds.
 
 ```
-     | wave stats | | total |  | wave results        |
-secs open conn clos totl  err  200  500  503  504  xxx Notes added by hand
+     | delta      | | total | | results              |
+secs  new conn clos totl  err  200  500  503  504  xxx Notes added by hand
 ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- -----------------------------------------------------
    0 1000    0    0 1000    0    0    0    0    0    0 1000 new non-blocking connections opened.
    2    0  256    0 1000    0    0    0    0    0    0 256 of the non-blocking connections actually connect.
