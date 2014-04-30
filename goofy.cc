@@ -440,7 +440,7 @@ int main(int argc, char **argv) {
     num = debug = stop_after = unique = wave_limit = 0;
     no_wave_limit = 1;
     // default wave spec is just one wave
-    wave_spec = "1:1";
+    wave_spec = "1000:1";
     max_fds = 256;
     while ((ch = getopt(argc, argv, "un:t:r:df:m:h:")) != -1) {
 	switch (ch) {
