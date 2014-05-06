@@ -39,7 +39,7 @@ Let's test whether Google handle 3 page requests at a time.
 $ goofy -n 3 -t 2000 -r 1000 http://www.google.com/
 ```
 
--n specifies the number of requests per wave, and -t specifies the time between
+-n specifies the number of requests per wave, -t specifies the time between
 waves (ms), and -r specifies the reporting period (ms). In this case, we're
 sending 3 requests every 2 seconds, but reporting every second. Here's the
 output:
@@ -75,7 +75,7 @@ At time 1, the delta-estb and clos(ed) columns both show 3, indicating that the
 time 0. At that instant, no connections were still open, so the pend and total-
 estb columns show zero; if a request had taken longer than 1 second, it would
 still be open and total-estb would show it. We also see that all 3 connections
-that closed got got HTTP status 200.
+that closed got HTTP status 200.
 
 At time 2, the second wave starts, and completes at time 3.
 
