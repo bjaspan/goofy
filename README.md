@@ -31,7 +31,57 @@ Usage: goofy [args] url
   -d               debug
 ```
 
-## A simple example: PHP-FPM process launching
+## Quick start
+
+Let's test whether Google handle three page requests per second.
+
+```
+$ goofy -n 3 -t 2000 -r 1000 http://www.google.com/
+```
+
+-n specifies the number of requests per wave, and -t specifies the time between
+waves (ms), and -r specifies the reporting period (ms). In this case, we're
+sending 3 requests every 2 seconds, but reporting every second. Here's the
+output:
+
+```
+     | delta      | | total | | results                   |
+secs  new estb clos pend estb errs  200  500  503  504  xxx
+---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+   0    3    0    0    3    0    0    0    0    0    0    0
+   1    0    3    3    0    0    0    3    0    0    0    0
+   2    3    0    0    3    0    0    0    0    0    0    0
+   3    0    3    3    0    0    0    3    0    0    0    0
+```
+
+The "delta" group shows what happened during the current reporting period. new
+is initiated but not yet established connections; estb is established
+connections, and clos is closed connections.
+
+The "total" group counts the status of all open but not yet complete
+connections. pend is initiated but not yet established, and estb is connected
+but not yet closed.
+
+The "results" group shows how many connections ended during that period and
+with what result. errs shows socket API errors (e.g. ECONNREFUSED), and the
+other columns show HTTP statuses.
+
+At time 0, we see 3 newly opened connections in the new column. They have not
+connected yet, so delta estb shows 0, and pend shows 3. No requests have
+completed.
+
+At time 1, the delta-estb and clos(ed) columns both show 3, indicating that the
+3 requests from the first wave got established, completed, and closed since
+time 0. At that instant, no connections were still open, so the pend and total-
+estb columns show zero; if a request had taken longer than 1 second, it would
+still be open and total-estb would show it. We also see that all 3 connections
+that closed got got HTTP status 200.
+
+At time 2, the second wave starts, and completes at time 3.
+
+So yes, Google can handle 3 requests per second. :-)
+
+## Test: PHP-FPM process launching
 
 [ This experiment was conducted in 2014. ]
 
