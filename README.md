@@ -122,7 +122,7 @@ spawned.
 Clearly, PHP-FPM is not behaving correctly. This data helped me track down the
 bug in the ondemand process manager; a fix is forthcoming.
 
-## A lengthy example: A History of a Thousand Conncetions
+## A lengthy example: A History of a Thousand Connections
 
 [ This experiment was conducted in 2010. ]
 
