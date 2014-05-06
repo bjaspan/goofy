@@ -33,7 +33,7 @@ Usage: goofy [args] url
 
 ## Quick start
 
-Let's test whether Google handle three page requests per second.
+Let's test whether Google handle 3 page requests at a time.
 
 ```
 $ goofy -n 3 -t 2000 -r 1000 http://www.google.com/
@@ -79,7 +79,7 @@ that closed got got HTTP status 200.
 
 At time 2, the second wave starts, and completes at time 3.
 
-So yes, Google can handle 3 requests per second. :-)
+So yes, Google can handle 3 requests at a time. :-)
 
 ## Test: PHP-FPM process launching
 
