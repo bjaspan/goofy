@@ -6,7 +6,7 @@
  * the number of connections opened, closed, and open, as well as how
  * connections closed (syscall error or HTTP status).
  */
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -97,13 +97,13 @@ public:
 	    exit(1);
 	}
     }
-	
+
     // STATIC. Fill in RESULT with X-Y.
     // Return 1 if the difference is negative, otherwise 0.
     static int timeval_subtract (struct timeval *result, const struct timeval *x, const struct timeval *y)
     {
 	struct timeval _y(*y);
-	
+
 	/* Perform the carry for the later subtraction by updating y. */
 	if (x->tv_usec < _y.tv_usec) {
 	    int nsec = (_y.tv_usec - x->tv_usec) / 1000000 + 1;
@@ -115,12 +115,12 @@ public:
 	    _y.tv_usec += 1000000 * nsec;
 	    _y.tv_sec -= nsec;
 	}
-     
+
 	/* Compute the time remaining to wait.
 	   tv_usec is certainly positive. */
 	result->tv_sec = x->tv_sec - _y.tv_sec;
 	result->tv_usec = x->tv_usec - _y.tv_usec;
-     
+
 	/* Return 1 if result is negative. */
 	return x->tv_sec < _y.tv_sec;
     }
@@ -164,12 +164,12 @@ void setnonblocking(int fd) {
     long arg;
     if ((arg = fcntl(fd, F_GETFL, NULL)) < 0) {
 	perror("fcntl(F_GETFL)");
-	exit(1); 
-    } 
-    arg |= O_NONBLOCK; 
+	exit(1);
+    }
+    arg |= O_NONBLOCK;
     if (fcntl(fd, F_SETFL, arg) < 0) {
 	perror("fcntl(F_SETFL)");
-	exit(1); 
+	exit(1);
     }
 }
 
@@ -178,12 +178,12 @@ void setblocking(int fd) {
     long arg;
     if ((arg = fcntl(fd, F_GETFL, NULL)) < 0) {
 	perror("fcntl(F_GETFL)");
-	exit(1); 
-    } 
-    arg &= ~O_NONBLOCK; 
+	exit(1);
+    }
+    arg &= ~O_NONBLOCK;
     if (fcntl(fd, F_SETFL, arg) < 0) {
 	perror("fcntl(F_SETFL)");
-	exit(1); 
+	exit(1);
     }
 }
 
@@ -292,7 +292,7 @@ void report_connections(time_interval *start) {
     else {
 	skip_if_nothing_happened = 0;
     }
-    
+
     intmap::iterator it;
     int connecting = 0, established = 0, errs = 0, http_errs = 0;
 
@@ -486,7 +486,7 @@ int main(int argc, char **argv) {
     if (num == 0 || wave_interval.get() == 0 || report_interval.get() == 0) {
 	usage();
     }
-    
+
     argc -= optind;
     argv += optind;
     if (argc != 1)
@@ -532,7 +532,7 @@ int main(int argc, char **argv) {
 	open_connections(num, (struct sockaddr *)&addr);
     }
     report_connections(&start);
-    
+
     int wait_interval = std::min(wave_interval.get(), report_interval.get())/1000;
     while (1) {
 	if (stop_after > 0) {
@@ -542,7 +542,7 @@ int main(int argc, char **argv) {
 		break;
 	    }
 	}
-	
+
 	int nfds = poll(fds, fds_len, wait_interval);
 	if (nfds < 0) {
 	    perror("poll");
@@ -561,16 +561,16 @@ int main(int argc, char **argv) {
 	    report_connections(&start);
 	    report_interval.mark(&now);
 	}
-	    
+
 	if (nfds == 0) {
 	    continue;
 	}
-	
+
 	for (int i = 0; i < fds_len; ++i) {
 	    // Presumably a non-blocking connect error?
 	    if (fds[i].revents & POLLERR) {
 		fds[i].revents &= ~POLLERR;
-		
+
 		int err = get_sock_error(i);
 		wave_stats.connect[err]++;
 		close_connection(i);
@@ -601,7 +601,7 @@ int main(int argc, char **argv) {
 		    if (delta > 1000000) {
 			printf("%d connect time: %lu\n", conn_info[i].request_number, delta);
 		    }
-		    
+
 		    // Build the URL and request headers.
 		    char request[8192];
 		    int found_ua = 0, found_host = 0;
@@ -631,9 +631,9 @@ int main(int argc, char **argv) {
 		    strcat(request, "\r\n");
 		    if (debug)
 			printf("%s", request);
-		    
+
 		    int request_len = strlen(request);
-		    
+
 		    // Send the request.
 		    if (write(fds[i].fd, request, request_len) != request_len) {
 			// We can't write the request to the socket, give up.
@@ -656,7 +656,7 @@ int main(int argc, char **argv) {
 	    // more data, we'll get it next time.
 	    if (fds[i].revents & POLLIN) {
 		fds[i].revents &= ~POLLIN;
-		
+
 		char buf[8192];
 		int n = read(fds[i].fd, buf, sizeof(buf));
 		if (n < 0) {
@@ -699,4 +699,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-
