@@ -32,6 +32,8 @@
 typedef std::map<int,int> intmap;
 typedef std::map<int, const char *> strmap;
 typedef std::vector<std::string> strvec;
+typedef std::vector<url> urlvec;
+typedef std::vector<struct sockaddr_in> addrvec;
 
 struct wave_stat {
     wave_stat() {
@@ -133,6 +135,7 @@ public:
 enum conn_state { CONN_UNUSED = 0, CONN_CONNECTING, CONN_ESTABLISHED, };
 struct conn_info_t {
     int request_number;
+    int url_number;
     enum conn_state state;
     struct timeval connecting;
     struct timeval connected;
@@ -147,7 +150,7 @@ int fds_len = 0;
 strmap http_codes;
 
 void usage() {
-    fprintf(stderr, "Usage: goofy [args] url\n"
+    fprintf(stderr, "Usage: goofy [args] url [url...]\n"
             "  -n num           number of requests per wave\n"
             "  -t ms[:limit]    milliseconds between waves; limit total waves\n"
             "                   default is one wave\n"
@@ -190,7 +193,7 @@ void setblocking(int fd) {
 /**
  * Initiate num new non-blocking connections to addr.
  */
-void open_connections(int num, struct sockaddr *addr) {
+void open_connections(int num, const addrvec &addrs, int &current_url) {
     int i, j;
 
     for (i = 0; i < num; ++i) {
@@ -210,6 +213,11 @@ void open_connections(int num, struct sockaddr *addr) {
 	    wave_stats.socket[errno]++;
 	    continue;
 	}
+
+	// Select the next address;
+	const struct sockaddr *addr = (struct sockaddr *) &addrs[current_url];
+	conn_info[j].url_number = current_url;
+	current_url = (current_url + 1) % addrs.size();
 
 	// Use non-blocking connects which correctly fail with EINPROGRESS.
 	setnonblocking(fd);
@@ -489,9 +497,15 @@ int main(int argc, char **argv) {
 
     argc -= optind;
     argv += optind;
-    if (argc != 1)
+    if (argc < 1)
 	usage();
-    url url(argv[0]);
+
+    urlvec urls;
+    while (*argv) {
+      url url(*argv++);
+      urls.push_back(url);
+    }
+    url url = urls[0];
 
     // Decide how many fds we can use.
     struct rlimit rlim;
@@ -512,24 +526,31 @@ int main(int argc, char **argv) {
     conn_info = (struct conn_info_t *)calloc(fds_len, sizeof(struct conn_info_t));
     init_http_codes();
     wave_stats.clear();
-    struct hostent *h = gethostbyname(url.host().c_str());
-    if (h == NULL) {
-	fprintf(stderr, "cannot resolve host: %s\n", url.host().c_str());
+
+    addrvec addrs;
+    for (int i = 0; i < urls.size(); i++) {
+      struct hostent *h = gethostbyname(urls[i].host().c_str());
+      if (h == NULL) {
+	fprintf(stderr, "cannot resolve host: %s\n", urls[i].host().c_str());
 	exit(1);
+      }
+
+      struct sockaddr_in addr;
+      memset(&addr, 0, sizeof(addr));
+      addr.sin_family = AF_INET;
+      addr.sin_port = htons(url.port());
+      memcpy(&addr.sin_addr.s_addr, h->h_addr, h->h_length);
+      addrs.push_back(addr);
     }
 
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(url.port());
-    memcpy(&addr.sin_addr.s_addr, h->h_addr, h->h_length);
+    int current_url = 0;
 
     // Mark time and kick off the first wave.
     struct timeval now;
     time_interval::gettod(&now);
     start.mark(&now);
     if (no_wave_limit || wave_limit-- > 0) {
-	open_connections(num, (struct sockaddr *)&addr);
+      open_connections(num, addrs, current_url);
     }
     report_connections(&start);
 
@@ -552,7 +573,7 @@ int main(int argc, char **argv) {
 	time_interval::gettod(&now);
 	if (wave_interval.passed(&now)) {
 	    if (no_wave_limit || wave_limit-- > 0) {
-		open_connections(num, (struct sockaddr *)&addr);
+	      open_connections(num, addrs, current_url);
 	    }
 	    wave_interval.mark(&now);
 	}
@@ -605,7 +626,7 @@ int main(int argc, char **argv) {
 		    // Build the URL and request headers.
 		    char request[8192];
 		    int found_ua = 0, found_host = 0;
-		    sprintf(request, "GET %s", url.request().c_str());
+		    sprintf(request, "GET %s", urls[conn_info[i].url_number].request().c_str());
 		    if (unique) {
 			sprintf(request+strlen(request), "&cnt=%d", conn_info[i].request_number);
 		    }
@@ -622,7 +643,7 @@ int main(int argc, char **argv) {
 		    }
 		    if (! found_host) {
 			strcat(request, "Host: ");
-			strcat(request, url.host().c_str());
+			strcat(request, urls[conn_info[i].url_number].host().c_str());
 			strcat(request, "\r\n");
 		    }
 		    if (! found_ua) {

@@ -20,7 +20,7 @@ connections closed (syscall error or HTTP status).
 ## Usage
 
 ```
-Usage: goofy [args] url
+Usage: goofy [args] url [url...]
   -n num           number of requests per wave
   -t ms[:limit]    milliseconds between waves; run limit total waves;
                    default to one wave
@@ -30,6 +30,8 @@ Usage: goofy [args] url
   -h hdr           add hdr ("Header: value") to each request
   -d               debug
 ```
+
+If multiple URLs are provided, goofy round-robins across them.
 
 ## Quick start
 
